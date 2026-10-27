@@ -71,6 +71,7 @@ not just prompts.
 ```bash
 python3 skills/yt-script/hookscore.py --hook "one line"        # 5-property hook panel
 python3 skills/yt-package/title.py --title "..." --thumb "..." # title + thumbnail linter
+python3 skills/yt-package/title.py --title "..." --lang es    # same linter for Spanish titles
 python3 skills/yt-edit/deadair.py transcript.srt               # edit decision list
 python3 skills/yt-chapters/chapters.py transcript.srt          # validated chapters
 python3 skills/yt-retention/retention.py retention.csv         # where they left, and why

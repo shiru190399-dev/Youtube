@@ -4,6 +4,7 @@
     python3 title.py --title "..." --thumb "AI RAN IT"
     python3 title.py titles.txt            # one per line, ranked
     python3 title.py --title "..." --json
+    python3 title.py titles.txt --lang es  # Spanish titles
 
 The pairing is the unit, not the title. A title that repeats the thumbnail text wastes half the
 click surface, and that is the single most common mistake this checks for.
@@ -15,12 +16,28 @@ tail, a mobile one can lose the subject.
 import json, re, sys, os
 
 DESKTOP, MOBILE, HARD = 60, 40, 100
-VAGUE = {"amazing","incredible","insane","crazy","huge","massive","ultimate","best","powerful",
-         "secret","revolutionary","mindblowing","epic","perfect","complete","everything"}
-STOP = {"the","a","an","of","for","to","in","on","and","or","is","are","with","your","you","my","i",
-        "this","that","it","how","what","why"}
+# Per-language lexicons. --lang es switches to Spanish; English stays the default.
+LEX = {
+    "en": {
+        "vague": {"amazing","incredible","insane","crazy","huge","massive","ultimate","best","powerful",
+                  "secret","revolutionary","mindblowing","epic","perfect","complete","everything"},
+        "stop": {"the","a","an","of","for","to","in","on","and","or","is","are","with","your","you","my","i",
+                 "this","that","it","how","what","why"},
+    },
+    "es": {
+        "vague": {"increíble","increible","alucinante","brutal","locura","épico","epico","perfecto","perfecta",
+                  "definitivo","definitiva","revolucionario","revolucionaria","secreto","secretos","potente",
+                  "mejor","mejores","completo","completa","todo","impresionante","espectacular","imprescindible",
+                  "bestial","enorme","masivo","top","única","único"},
+        "stop": {"el","la","los","las","un","una","unos","unas","de","del","al","a","en","y","e","o","u","con",
+                 "por","para","que","qué","cómo","como","es","son","tu","tus","mi","mis","se","lo","su","sus",
+                 "este","esta","esto","eso","ya","no","si","sí","cuál","cuando","cuándo","te","le","sin"},
+    },
+}
+VAGUE, STOP = LEX["en"]["vague"], LEX["en"]["stop"]
 
-def words(t): return re.findall(r"[a-z0-9']+", t.lower())
+# Unicode-aware \w: accented words such as "cómo" are not split in two
+def words(t): return re.findall(r"[\w']+", t.lower())
 
 def check(title, thumb=None):
     t = title.strip()
@@ -32,7 +49,8 @@ def check(title, thumb=None):
     if n > MOBILE:
         head = t[:MOBILE].rsplit(" ", 1)[0]
         issues.append(("mobile", f'a mobile feed shows about "{head}..." - check the subject survives'))
-    caps = [w for w in t.split() if len(w) > 2 and w.isupper()]
+    # Short acronyms (API, MCP, OCR) are not shouting
+    caps = [w for w in t.split() if len(w.strip("¿?¡!.,:")) > 4 and w.isupper()]
     if len(caps) > 2: issues.append(("shouting", f"{len(caps)} all-caps words - two is the ceiling before it reads as spam"))
     elif caps: good.append(f"{len(caps)} all-caps word for emphasis")
     v = [w for w in words(t) if w in VAGUE]
@@ -40,7 +58,7 @@ def check(title, thumb=None):
     nums = re.findall(r"\d[\d,.]*%?", t)
     if nums: good.append(f"carries a concrete figure ({', '.join(nums[:3])})")
     else: issues.append(("no-number", "no number, date or name - the most reliable single fix"))
-    if t.endswith("?"): good.append("open question in the title")
+    if t.endswith("?") or t.startswith("¿"): good.append("open question in the title")
     front = [w for w in words(t)[:3] if w not in STOP]
     if not front: issues.append(("front-load", "the first three words are all filler - move the subject forward"))
     if thumb:
@@ -65,6 +83,11 @@ def show(r):
 def main():
     a = sys.argv[1:]
     as_json = "--json" in a; a = [x for x in a if x != "--json"]
+    global VAGUE, STOP
+    if "--lang" in a:
+        lang = a[a.index("--lang") + 1]
+        a = [x for i, x in enumerate(a) if x != "--lang" and (i == 0 or a[i - 1] != "--lang")]
+        VAGUE, STOP = LEX[lang]["vague"], LEX[lang]["stop"]
     thumb = a[a.index("--thumb") + 1] if "--thumb" in a else None
     if "--title" in a:
         rows = [check(a[a.index("--title") + 1], thumb)]
